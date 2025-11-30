@@ -20,7 +20,7 @@ class CityscapesDataset(torch.utils.data.Dataset):
             # Get all image paths from city folder
             img_paths = sorted((self.img_dir / city).glob("*_leftImg8bit.png"))
             # Get all label paths from city folder
-            label_paths = sorted((self.label_dir / city).glob("*_gtFine_labelIds.png"))
+            label_paths = sorted((self.label_dir / city).glob("*_gtFine_labelTrainIds.png"))
             for img_path, label_path in zip(img_paths, label_paths):
                 self.data.append((img_path, label_path))
 

@@ -1,7 +1,7 @@
 import torch
 import cv2
 
-class CityScapesDataset(torch.utils.data.Dataset):
+class CityscapesDataset(torch.utils.data.Dataset):
     def __init__(self, img_dir, label_dir, split="train", image_transform=None, label_transform=None):
         valid_splits = {"test", "train", "val"}
         if split not in valid_splits:
@@ -36,12 +36,10 @@ class CityScapesDataset(torch.utils.data.Dataset):
         
         label = cv2.imread(str(label_path), cv2.IMREAD_UNCHANGED)
 
-        if self.transform:
-            img = self.transform(img)
-        if self.target_transform:
-            label = self.target_transform(label)
-        else:
-            label = torch.as_tensor(label, dtype=torch.long)
+        if self.image_transform:
+            img = self.image_transform(img)
+        if self.label_transform:
+            label = self.label_transform(label)
         return img, label
     
 # Reference: https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files

@@ -33,6 +33,7 @@ class UpConvBlock(nn.Module):
 class UNet(nn.Module):
     def __init__(self, num_classes):
         super(UNet, self).__init__()
+        self.name = "u-net"
         self.num_classes = num_classes
 
         ### Encoder

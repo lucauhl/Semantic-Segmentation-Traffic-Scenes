@@ -23,7 +23,7 @@ class FocalLoss(nn.Module):
         if alpha is not None and isinstance(alpha, torch.Tensor):
             self.alpha = alpha
         else:
-            alpha = None
+            self.alpha = None
 
     def forward(self, logits, targets):
         """

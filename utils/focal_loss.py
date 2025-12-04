@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+"""
+Focal loss implementation supporting ignore_index and optional class weights (alpha)
+Reference: https://github.com/itakurah/Focal-loss-PyTorch
+"""
+
 class FocalLoss(nn.Module):
     def __init__(self, gamma=2.0, ignore_index=255, alpha=None, reduction="mean"):
         """

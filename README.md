@@ -22,3 +22,16 @@ data/
     ├── leftImg8bit_trainvaltest/...
     └── leftImg8bit_trainextra/...
 ```
+
+### Preprocessing
+
+Before training, you must generate the `trainId` label images. The default Cityscapes annotations contain many classes that are not used for training. The following script converts these annotations into the standard 19 classes (TrainIDs) and saves them as `_labelTrainIds.png` files, which are required for the dataloader.
+
+Run the following commands:
+
+```bash
+# Set environment variable to the dataset directory
+export CITYSCAPES_DATASET="./data/cityscapes"
+
+# Generate trainId label images
+python -m cityscapesscripts.preparation.createTrainIdLabelImgs

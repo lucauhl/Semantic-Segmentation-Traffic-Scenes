@@ -1,7 +1,7 @@
-import torch
+from torch.utils.data import Dataset
 import cv2
 
-class CityscapesDataset(torch.utils.data.Dataset):
+class CityscapesDataset(Dataset):
     def __init__(self, img_dir, label_dir, split="train", image_transform=None, label_transform=None):
         valid_splits = {"test", "train", "val"}
         if split not in valid_splits:

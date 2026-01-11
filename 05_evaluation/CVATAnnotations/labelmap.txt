@@ -1,0 +1,22 @@
+# label:color_rgb:parts:actions
+background:0,0,0::
+bicycle:119,11,32::
+building:70,70,70::
+bus:0,60,100::
+car:0,0,142::
+guard rail:180,165,180::
+motorcycle:0,0,230::
+parking:250,170,160::
+person:220,20,60::
+pole:153,153,153::
+rail track:230,150,140::
+rider:255,0,0::
+road:128,64,128::
+sidewalk:244,35,232::
+sky:70,130,180::
+terrain:152,251,152::
+traffic light:250,170,30::
+traffic sign:220,220,0::
+train:0,80,100::
+truck:0,0,70::
+vegetation:107,142,35::

@@ -169,19 +169,25 @@ class JointColorJitter:
 
 # https://www.kaggle.com/c/siim-isic-melanoma-classification/discussion/169721
 class RandomCoarseDropout:
-    """Schneidet Rechtecke aus dem Bild (Cutout)."""
+    """
+    Schneidet Rechtecke aus dem Bild (Cutout) UND dem Label.
+    Das Label wird dabei mit dem ignore_index gefüllt.
+    """
 
-    def __init__(self, max_holes=8, max_height=32, max_width=32, p=0.5):
+    def __init__(self, max_holes=8, max_height=32, max_width=32, p=0.5, fill_label=255):
         self.max_holes = max_holes
         self.max_height = max_height
         self.max_width = max_width
         self.p = p
+        self.fill_label = fill_label  # Der Wert, der im Label gesetzt wird (z.B. 255 für ignore)
 
     def __call__(self, image, label):
         if random.random() < self.p:
             w, h = image.size
-            arr = np.array(image)
-            # Maske wird hier NICHT verändert (Modell soll lernen, verdeckte Dinge zu erkennen)
+
+            # Bild und Label in Numpy-Arrays wandeln
+            img_arr = np.array(image)
+            lbl_arr = np.array(label)
 
             num_holes = random.randint(1, self.max_holes)
             for _ in range(num_holes):
@@ -193,9 +199,21 @@ class RandomCoarseDropout:
                 y2 = min(h, y + h_hole)
                 x2 = min(w, x + w_hole)
 
-                arr[y:y2, x:x2, :] = 0
+                # Bild: Setze Pixel auf Schwarz (0)
+                # Check, ob Bild 2D (Graustufen) oder 3D (RGB) ist
+                if len(img_arr.shape) == 3:
+                    img_arr[y:y2, x:x2, :] = 0
+                else:
+                    img_arr[y:y2, x:x2] = 0
 
-            image = Image.fromarray(arr)
+                # Label: Setze Pixel auf ignore_index (255)
+                # Labels sind in der Regel 2D (H, W)
+                lbl_arr[y:y2, x:x2] = self.fill_label
+
+            # Zurück zu PIL Images
+            image = Image.fromarray(img_arr)
+            label = Image.fromarray(lbl_arr)
+
         return image, label
 
 
@@ -260,5 +278,3 @@ class JointCompose:
         for t in self.transforms:
             image, label = t(image, label)
         return image, label
-
-

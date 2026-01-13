@@ -7,46 +7,69 @@ SegFormer Architecture Implementation (Standalone PyTorch)
 Based on: "SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers"
 Paper: https://arxiv.org/abs/2105.15203
 
-Dies ist die Konfiguration für SegFormer-B0 (leichtgewichtig).
+Dies ist eine variable Konfiguration
 """
 
+# Konfigurationen definieren
+MIT_CONFIGS = {
+    "b0": {
+        "embed_dims": [32, 64, 160, 256],
+        "depths": [2, 2, 2, 2],
+        "sr_ratios": [8, 4, 2, 1],
+        "drop_path_rate": 0.1
+    },
+    "b1": {
+        "embed_dims": [64, 128, 320, 512],
+        "depths": [2, 2, 2, 2],
+        "sr_ratios": [8, 4, 2, 1],
+        "drop_path_rate": 0.1
+    },
+    "b2": {
+        "embed_dims": [64, 128, 320, 512],
+        "depths": [3, 4, 6, 3],
+        "sr_ratios": [8, 4, 2, 1],
+        "drop_path_rate": 0.1
+    }
+}
 
-# --- Helper Module: Layer Scale / DropPath ---
-class DropPath(nn.Module):
-    """Drop paths (Stochastic Depth) per sample."""
 
-    def __init__(self, drop_prob=None):
-        super(DropPath, self).__init__()
-        self.drop_prob = drop_prob
+class SegFormer(nn.Module):
+    def __init__(self, num_classes=10, phi="b0"):
+        super(SegFormer, self).__init__()
+        self.name = f"segformer-{phi}"
+
+        # Prüfen, ob Config existiert
+        if phi not in MIT_CONFIGS:
+            raise ValueError(f"Model config {phi} not found.")
+
+        # Config laden
+        cfg = MIT_CONFIGS[phi]
+
+        self.backbone = MixVisionTransformer(
+            embed_dims=cfg["embed_dims"],
+            num_heads=[1, 2, 5, 8],
+            mlp_ratios=[4, 4, 4, 4],
+            sr_ratios=cfg["sr_ratios"],
+            depths=cfg["depths"],
+            drop_path_rate=cfg["drop_path_rate"]
+        )
+
+        # Head: Channels ebenfalls aus cfg nehmen
+        self.decode_head = SegFormerHead(
+            in_channels=cfg["embed_dims"],
+            embedding_dim=256,
+            num_classes=num_classes
+        )
 
     def forward(self, x):
-        if self.drop_prob == 0. or not self.training:
-            return x
-        keep_prob = 1 - self.drop_prob
-        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
-        random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
-        random_tensor.floor_()
-        return x.div(keep_prob) * random_tensor
+        # Image size for final upsampling
+        H, W = x.shape[2], x.shape[3]
 
+        features = self.backbone(x)
+        logits = self.decode_head(features)
 
-# --- Teil 1: Encoder Blöcke (Mix Transformer - MiT) ---
-
-class OverlapPatchEmbed(nn.Module):
-    """Image to Patch Embedding mit überlappenden Patches"""
-
-    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768):
-        super().__init__()
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
-                              padding=patch_size // 2)
-        self.norm = nn.LayerNorm(embed_dim)
-
-    def forward(self, x):
-        x = self.proj(x)
-        B, C, H, W = x.shape
-        x = x.flatten(2).transpose(1, 2)  # [B, N, C]
-        x = self.norm(x)
-        return x, H, W
-
+        logits = F.interpolate(logits, size=(H, W), mode='bilinear', align_corners=False)
+        return logits
 
 class EfficientAttention(nn.Module):
     """Efficient Self-Attention mit Spatial Reduction"""
@@ -259,53 +282,48 @@ class SegFormerHead(nn.Module):
         x = self.classifier(x)
         return x
 
+# --- Helper Module: Layer Scale / DropPath ---
+class DropPath(nn.Module):
+    """Drop paths (Stochastic Depth) per sample."""
 
-# --- Hauptmodell: SegFormer ---
-
-class SegFormer(nn.Module):
-    def __init__(self, num_classes=10):
-        super(SegFormer, self).__init__()
-        self.name = "segformer-b0"
-
-        # Backbone: MiT-B0 configuration
-        self.backbone = MixVisionTransformer(
-            embed_dims=[32, 64, 160, 256],
-            num_heads=[1, 2, 5, 8],
-            mlp_ratios=[4, 4, 4, 4],
-            sr_ratios=[8, 4, 2, 1],
-            depths=[2, 2, 2, 2],
-            drop_path_rate=0.1
-        )
-
-        # Head
-        self.decode_head = SegFormerHead(
-            in_channels=[32, 64, 160, 256],
-            embedding_dim=256,
-            num_classes=num_classes
-        )
+    def __init__(self, drop_prob=None):
+        super(DropPath, self).__init__()
+        self.drop_prob = drop_prob
 
     def forward(self, x):
-        # Image size for final upsampling
-        H, W = x.shape[2], x.shape[3]
+        if self.drop_prob == 0. or not self.training:
+            return x
+        keep_prob = 1 - self.drop_prob
+        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+        random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
+        random_tensor.floor_()
+        return x.div(keep_prob) * random_tensor
 
-        # Encoder features (List of 4 feature maps)
-        features = self.backbone(x)
+# --- Teil 1: Encoder Blöcke (Mix Transformer - MiT) ---
 
-        # Decoder
-        logits = self.decode_head(features)
+class OverlapPatchEmbed(nn.Module):
+    """Image to Patch Embedding mit überlappenden Patches"""
 
-        # Final upsample to original image size (stride 4 -> stride 1)
-        logits = F.interpolate(logits, size=(H, W), mode='bilinear', align_corners=False)
+    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768):
+        super().__init__()
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
+                              padding=patch_size // 2)
+        self.norm = nn.LayerNorm(embed_dim)
 
-        return logits
+    def forward(self, x):
+        x = self.proj(x)
+        B, C, H, W = x.shape
+        x = x.flatten(2).transpose(1, 2)  # [B, N, C]
+        x = self.norm(x)
+        return x, H, W
 
 
 if __name__ == '__main__':
-    ### Sanity Check (gleiche Logik wie unet)
+    ### Sanity Check
     input_tensor = torch.randn(1, 3, 1024, 2048)
 
     # Modell initialisieren
-    model = SegFormer(num_classes=10)
+    model = SegFormer(num_classes=10, phi="b1")
     print(f"Testing {model.name}...")
 
     # Output size check

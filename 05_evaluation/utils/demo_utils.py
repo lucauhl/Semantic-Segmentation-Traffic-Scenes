@@ -98,7 +98,7 @@ def compute_accuracy(pred, truth, ignore_index=255):
     return (pred == truth).float().mean()
 
 ### Model
-def build_model(model_name, num_classes, backbone="b0"):
+def build_model(model_name, num_classes, backbone="b1"):
     name = model_name.lower()
     if name == "unet":
         return UNet(num_classes)
@@ -108,28 +108,33 @@ def build_model(model_name, num_classes, backbone="b0"):
         return SegFormer(num_classes, phi=backbone)
     raise ValueError(f"Unsupported model: {model_name}")
 
-def load_model(name, checkpoint, num_classes=20):
-    # Setup the device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') # cpu inference for one picture only takes a few seconds
 
-    # Load checkpoint by checkpoint name
-    checkpoint = torch.load(f"../checkpoints/{checkpoint}/best_{checkpoint}.pth", weights_only=False)
-    # Build the model and move to device, load the parameters from checkpoint, set the model to eval mode for inference
+def load_model(name, checkpoint, num_classes=20):
+    # Wenn CUDA verfügbar ist, wird 'cuda' genutzt, sonst 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # 2. Checkpoint laden
+    # WICHTIG: map_location=device sorgt dafür, dass die Gewichte auf das richtige Gerät (z.B. CPU) gemappt werden
+    checkpoint_path = f"../checkpoints/{checkpoint}/best_{checkpoint}.pth"
+    checkpoint_data = torch.load(checkpoint_path, map_location=device, weights_only=False)
+
+    # 3. Modell bauen und auf das Gerät schieben
     model = build_model(name, num_classes)
     model_name = getattr(model, "name")
     model = model.to(device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+
+    # 4. Gewichte laden
+    model.load_state_dict(checkpoint_data["model_state_dict"])
     model.eval()
     
     print(f"Loaded model: {model_name}")
     print(f"Best checkpoint:")
-    print(f" - Epoch: {checkpoint['epoch']}")
-    print(f" - Train Loss: {checkpoint['train_loss']}")
-    print(f" - Train Accuracy: {checkpoint['train_acc']}")
-    print(f" - Train MIoU: {checkpoint['train_miou']}")
-    print(f" - Val Loss: {checkpoint['val_loss']}")
-    print(f" - Val Accuracy: {checkpoint['val_acc']}")
-    print(f" - Val MIoU: {checkpoint['val_miou']}")
+    print(f" - Epoch: {checkpoint_data['epoch']}")
+    print(f" - Train Loss: {checkpoint_data['train_loss']}")
+    print(f" - Train Accuracy: {checkpoint_data['train_acc']}")
+    print(f" - Train MIoU: {checkpoint_data['train_miou']}")
+    print(f" - Val Loss: {checkpoint_data['val_loss']}")
+    print(f" - Val Accuracy: {checkpoint_data['val_acc']}")
+    print(f" - Val MIoU: {checkpoint_data['val_miou']}")
 
     return model, device
 

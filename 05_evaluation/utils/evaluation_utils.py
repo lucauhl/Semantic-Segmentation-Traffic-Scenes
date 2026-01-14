@@ -8,8 +8,18 @@ import numpy as np
 # Add project directories so local modules import correctly
 import sys
 from pathlib import Path
-repo_root = Path.cwd()
-for p in (repo_root / "../04_modeling", repo_root / "../03_datapreparation"):
+
+cwd = Path.cwd().resolve()
+repo_root = None
+for cand in [cwd, *cwd.parents]:
+    if (cand / "04_modeling").exists() and (cand / "03_datapreparation").exists():
+        repo_root = cand
+        break
+
+if repo_root is None:
+    repo_root = cwd
+
+for p in (repo_root / "04_modeling", repo_root / "03_datapreparation"):
     p_str = str(p)
     if p_str not in sys.path:
         sys.path.append(p_str)

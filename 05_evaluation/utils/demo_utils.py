@@ -21,6 +21,9 @@ from models.segformer import SegFormer
 import matplotlib.pyplot as plt
 
 ### Helpers
+# Original 1536, 2048
+# Crop auf Cityscapes Format (1024, 2048)
+HEIGHT, WIDTH = 512, 1024
 # Cityscapes 20 class colors (R,G,B) based on current trainIds (added vegetation and parking classes)
 CITYSCAPES_COLORS_20 = np.array([
     [128, 64,128],  # 0: road
@@ -128,23 +131,22 @@ def load_model(name, checkpoint, num_classes=20):
     
     print(f"Loaded model: {model_name}")
     print(f"Best checkpoint:")
-    print(f" - Epoch: {checkpoint_data['epoch']}")
-    print(f" - Train Loss: {checkpoint_data['train_loss']}")
-    print(f" - Train Accuracy: {checkpoint_data['train_acc']}")
-    print(f" - Train MIoU: {checkpoint_data['train_miou']}")
-    print(f" - Val Loss: {checkpoint_data['val_loss']}")
-    print(f" - Val Accuracy: {checkpoint_data['val_acc']}")
-    print(f" - Val MIoU: {checkpoint_data['val_miou']}")
+    print(f" - Epoch: {checkpoint_data['epoch']:.3f}")
+    print(f" - Train Loss: {checkpoint_data['train_loss']:.3f}")
+    print(f" - Train Accuracy: {checkpoint_data['train_acc']:.3f}")
+    print(f" - Train MIoU: {checkpoint_data['train_miou']:.3f}")
+    print(f" - Val Loss: {checkpoint_data['val_loss']:.3f}")
+    print(f" - Val Accuracy: {checkpoint_data['val_acc']:.3f}")
+    print(f" - Val MIoU: {checkpoint_data['val_miou']:.3f}")
 
     return model, device
 
 ### Inference, Evaluation and Visualization
 def infer(model, device, image):
     # Transforms 
-    height, width = 768, 1024 # Original 1536, 2048
     def image_transform(image):
         image = Image.fromarray(image)  # numpy -> PIL
-        image = F.resize(image, (height, width), interpolation=F.InterpolationMode.BILINEAR) # Bilinear for RGB-Images
+        image = F.resize(image, (HEIGHT, WIDTH), interpolation=F.InterpolationMode.BILINEAR) # Bilinear for RGB-Images
         image = F.pil_to_tensor(image).float() / 255.0  # Scaling
         return image
     
@@ -161,10 +163,9 @@ def infer(model, device, image):
 
 def eval(pred, truth, num_classes):
     # Transforms 
-    height, width = 768, 1024 # Original 1536, 2048
     def label_transform(label):
         label = Image.fromarray(label)  # numpy -> PIL
-        label = F.resize(label, (height, width), interpolation=F.InterpolationMode.NEAREST) # Nearest Neighbor for Labels
+        label = F.resize(label, (HEIGHT, WIDTH), interpolation=F.InterpolationMode.NEAREST) # Nearest Neighbor for Labels
         label = F.pil_to_tensor(label).long().squeeze()  # PIL -> LongTensor no Scaling, squeeze() to remove channel dimension
         return label
     

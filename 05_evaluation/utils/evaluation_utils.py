@@ -1,10 +1,10 @@
-# Image libraries
-import numpy as np
 from PIL import Image
-import cv2
-# PyTorch
 import torch
 import torchvision.transforms.functional as F
+import matplotlib.pyplot as plt
+import cv2
+import numpy as np
+
 # Add project directories so local modules import correctly
 import sys
 from pathlib import Path
@@ -17,8 +17,7 @@ for p in (repo_root / "../04_modeling", repo_root / "../03_datapreparation"):
 from models.unet import UNet
 from models.deeplab import DeepLabV3Plus
 from models.segformer import SegFormer
-# Visualization
-import matplotlib.pyplot as plt
+
 
 ### Helpers
 # Original 1536, 2048
@@ -139,7 +138,16 @@ def load_model(name, checkpoint, num_classes=20):
     print(f" - Val Accuracy: {checkpoint_data['val_acc']:.3f}")
     print(f" - Val MIoU: {checkpoint_data['val_miou']:.3f}")
 
-    return model, device
+    # Trainings-Statistiken extrahieren
+    train_stats = {
+        "epoch": checkpoint_data.get('epoch', 0),
+        "train_miou": checkpoint_data.get('train_miou', 0.0),
+        "train_acc": checkpoint_data.get('train_acc', 0.0),
+        "val_miou": checkpoint_data.get('val_miou', 0.0),
+        "val_acc": checkpoint_data.get('val_acc', 0.0),
+    }
+
+    return model, device, train_stats
 
 ### Inference, Evaluation and Visualization
 def infer(model, device, image):
@@ -189,3 +197,72 @@ def plot_images(image, image_title, label, label_title, figsize=(12, 6)):
 
     plt.show()
 
+# --- VISUALISIERUNG ( 3er Plot Funktion) ---
+def plot_three_images(img1, title1, img2, title2, img3, title3, figsize=(18, 6)):
+    _, ax = plt.subplots(1, 3, figsize=figsize)
+    ax[0].imshow(img1); ax[0].set_title(title1); ax[0].axis("off")
+    ax[1].imshow(img2); ax[1].set_title(title2); ax[1].axis("off")
+    ax[2].imshow(img3); ax[2].set_title(title3); ax[2].axis("off")
+    plt.show()
+
+
+def run_evaluation_pipeline(model_type, checkpoint_name, base_path="./CVATAnnotations", show_plots=True):
+    cvat_path = Path(base_path)
+    if not cvat_path.exists():
+        print(f"Path {base_path} does not exist.")
+        return None
+
+    # Modell und gespeicherte Stats laden
+    model, device, train_stats = load_model(model_type, checkpoint_name)
+
+    image_files = sorted(list(cvat_path.glob("*r.jpg")))
+
+    # Listen für die neuen Eval-Ergebnisse
+    eval_mious = []
+    eval_accs = []
+
+    for image_path in image_files:
+        label_name = image_path.name.replace("r.jpg", ".png")
+        label_path = cvat_path / label_name
+
+        if not label_path.exists(): continue
+
+        image = cv2.imread(str(image_path))
+        if image is None: continue
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        rgb_label = cv2.imread(str(label_path))
+        if rgb_label is None: continue
+        rgb_label = cv2.cvtColor(rgb_label, cv2.COLOR_BGR2RGB)
+
+        prediction = infer(model, device, image)
+        miou, _, acc = eval(prediction, rgb_label, num_classes=20)
+
+        eval_mious.append(miou)
+        eval_accs.append(acc)
+
+        if show_plots:
+            rgb_pred = label_to_color(prediction.numpy(), CITYSCAPES_COLORS_20)
+            plot_three_images(
+                image, f"Original: {image_path.name}",
+                rgb_label, "Ground Truth",
+                rgb_pred, f"Pred ({model_type})"
+            )
+
+    # Durchschnitt für Regensburg (Eval) berechnen
+    avg_eval_miou = np.mean(eval_mious) if eval_mious else 0.0
+    avg_eval_acc = np.mean(eval_accs) if eval_accs else 0.0
+
+    # Zusammenfassendes Dictionary erstellen
+    summary = {
+        "Model": model_type,
+        "Checkpoint": checkpoint_name,
+        "Train MIoU": train_stats['train_miou'],
+        "Train Acc": train_stats['train_acc'],
+        "Val (Cityscapes) MIoU": train_stats['val_miou'],
+        "Val (Cityscapes) Acc": train_stats['val_acc'],
+        "Eval (Regensburg) MIoU": avg_eval_miou,
+        "Eval (Regensburg) Acc": avg_eval_acc
+    }
+
+    return summary

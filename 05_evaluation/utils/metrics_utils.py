@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import cv2
+import matplotlib.pyplot as plt
 
 try:
     from skimage.feature import peak_local_max as sk_peak_local_max
@@ -13,31 +14,31 @@ except ImportError:
 
 DEFAULT_IGNORE_TRAIN_IDS = {255, -1}
 DEFAULT_IGNORE_NAMES = {"background"}
+EXCLUDE_CLASS_NAMES = {"background"}
 
 # Per-class instance method. Adjust here as needed.
 # Supported methods: "cc", "watershed", "peaks".
 INSTANCE_METHODS = {
-    "background": "cc",
-    "road": "cc",
-    "sidewalk": "cc",
+    "road": "watershed",
+    "sidewalk": "watershed",
     "parking": "cc",
     "rail track": "cc",
-    "building": "cc",
+    "building": "watershed",
     "guard rail": "cc",
-    "pole": "cc",
-    "traffic light": "cc",
+    "pole": "watershed",
+    "traffic light": "peaks",
     "traffic sign": "cc",
     "vegetation": "cc",
-    "terrain": "cc",
-    "sky": "cc",
-    "person": "watershed",
-    "rider": "watershed",
-    "car": "watershed",
-    "truck": "watershed",
-    "bus": "watershed",
+    "terrain": "watershed",
+    "sky": "watershed",
+    "person": "cc",
+    "rider": "cc",
+    "car": "peaks",
+    "truck": "cc",
+    "bus": "peaks",
     "train": "watershed",
-    "motorcycle": "peaks",
-    "bicycle": "peaks",
+    "motorcycle": "cc",
+    "bicycle": "cc",
 }
 DEFAULT_INSTANCE_METHOD = "cc"
 
@@ -45,27 +46,26 @@ DEFAULT_INSTANCE_METHOD = "cc"
 MANUAL_METRICS = {
     "bild6.png": {
         "instances": {
-            "background": 0,
-            "road": 0,
-            "sidewalk": 0,
+            "road": 2,
+            "sidewalk": 4,
             "parking": 0,
             "rail track": 0,
-            "building": 0,
+            "building": 5,
             "guard rail": 0,
-            "pole": 0,
-            "traffic light": 0,
-            "traffic sign": 0,
-            "vegetation": 0,
-            "terrain": 0,
-            "sky": 0,
+            "pole": 15,
+            "traffic light": 17,
+            "traffic sign": 10,
+            "vegetation": 8,
+            "terrain": 5,
+            "sky": 1,
             "person": 3,
-            "rider": 0,
-            "car": 7,
-            "truck": 1,
-            "bus": 0,
+            "rider": 3,
+            "car": 16,
+            "truck": 0,
+            "bus": 1,
             "train": 0,
-            "motorcycle": 0,
-            "bicycle": 1,
+            "motorcycle": 1,
+            "bicycle": 3,
         },
         "notes": "sample values",
     }
@@ -80,9 +80,12 @@ WS_PEAK_EPS = 1e-6
 WS_SEED_OPEN_KERNEL = 1
 
 # Peak parameters
-PEAK_DIST_REL = 0.20
-PEAK_MIN_DISTANCE = 6
-PEAK_ERODE_ITERS = 1
+PEAK_DIST_REL = 0.07
+PEAK_MIN_DISTANCE = 5
+PEAK_ERODE_ITERS = 0
+
+# CC parameters
+CC_MIN_AREA = 20
 
 
 def find_cvat_annotations(start_path=None):
@@ -172,6 +175,8 @@ def load_labelmap(labelmap_path: Path):
             color_str = rest.split(":", 1)[0]
         except ValueError:
             continue
+        if name in EXCLUDE_CLASS_NAMES:
+            continue
 
         rgb = tuple(int(c) for c in color_str.split(","))
         rec = {
@@ -241,7 +246,7 @@ def compute_entropy(class_counts, classes, ignore_train_ids=None, ignore_names=N
     return entropy
 
 
-def compute_cc_instances(mask_rgb, classes):
+def compute_cc_instances(mask_rgb, classes, min_area=CC_MIN_AREA):
     mask = _ensure_rgb(mask_rgb)
     counts = {c["name"]: 0 for c in classes}
     for rec in classes:
@@ -249,8 +254,12 @@ def compute_cc_instances(mask_rgb, classes):
         binary = np.all(mask == color, axis=2).astype(np.uint8)
         if binary.sum() == 0:
             continue
-        num_components, _ = cv2.connectedComponents(binary)
-        counts[rec["name"]] = max(num_components - 1, 0)
+        num_components, _, stats, _ = cv2.connectedComponentsWithStats(binary)
+        if num_components <= 1:
+            counts[rec["name"]] = 0
+            continue
+        areas = stats[1:, cv2.CC_STAT_AREA]
+        counts[rec["name"]] = int((areas >= min_area).sum())
     return counts
 
 
@@ -497,7 +506,7 @@ def compute_metrics_from_rgb(
     }
 
 
-def build_instance_table(metrics, classes):
+def build_instance_table(metrics, classes, manual_metrics=None, image_key=None):
     rows = []
     for rec in classes:
         name = rec["name"]
@@ -505,32 +514,60 @@ def build_instance_table(metrics, classes):
             {
                 "class": name,
                 "method": metrics["instance_method"].get(name, DEFAULT_INSTANCE_METHOD),
-                "pixel_share": metrics["class_shares"].get(name, 0.0),
-                "pixel_count": metrics["class_counts"].get(name, 0),
                 "computed_instances": metrics["instances"].get(name, 0),
             }
         )
     df = pd.DataFrame(rows).set_index("class")
+    if manual_metrics is not None and image_key is not None:
+        manual_df = build_manual_instance_table(image_key, manual_metrics=manual_metrics)
+        df = df.join(manual_df, how="left")
+    if "ground_truth_instances" in df.columns:
+        df["computed_instances"] = df["computed_instances"].fillna(0).astype(int)
+        df["ground_truth_instances"] = df["ground_truth_instances"].fillna(0).astype(int)
+        df["diff"] = (df["computed_instances"] - df["ground_truth_instances"]).abs()
+        df["pct_diff"] = np.where(
+            df["ground_truth_instances"] > 0,
+            df["diff"] / df["ground_truth_instances"] * 100.0,
+            np.where(df["computed_instances"] > 0, 100.0, 0.0),
+        )
+        df["pct_diff"] = df["pct_diff"].round(0).astype(int)
     return df
 
 
 def build_manual_instance_table(image_key, manual_metrics=None):
     manual_metrics = manual_metrics or MANUAL_METRICS
     manual = manual_metrics.get(image_key, {}).get("instances", {})
-    df = pd.DataFrame({"manual_instances": manual}).rename_axis("class")
+    df = pd.DataFrame({"ground_truth_instances": manual}).rename_axis("class")
     return df
 
 
-def build_instance_comparison_table(computed_df, manual_df):
-    df = computed_df[["method", "computed_instances"]].join(manual_df, how="outer")
+def build_instance_comparison_table(instances_df):
+    df = instances_df.copy()
+    if "ground_truth_instances" not in df.columns:
+        df["ground_truth_instances"] = 0
     df["computed_instances"] = df["computed_instances"].fillna(0).astype(int)
-    df["manual_instances"] = df["manual_instances"].fillna(0).astype(int)
-    df["diff"] = df["computed_instances"] - df["manual_instances"]
-    df["abs_diff"] = df["diff"].abs()
+    df["ground_truth_instances"] = df["ground_truth_instances"].fillna(0).astype(int)
+    df["diff"] = (df["computed_instances"] - df["ground_truth_instances"]).abs()
+    df["pct_diff"] = np.where(
+        df["ground_truth_instances"] > 0,
+        df["diff"] / df["ground_truth_instances"] * 100.0,
+        np.where(df["computed_instances"] > 0, 100.0, 0.0),
+    )
     return df
 
 
-def build_metrics_report(image_key, metrics, classes, manual_metrics=None):
+def build_metrics_report(image_key, metrics, classes, manual_metrics=None, manual_key=None):
+    manual_key = manual_key or image_key
+    instances_df = build_instance_table(
+        metrics,
+        classes,
+        manual_metrics=manual_metrics,
+        image_key=manual_key,
+    )
+    compare_df = build_instance_comparison_table(instances_df)
+    overall_pct_diff = float(compare_df["pct_diff"].mean()) if not compare_df.empty else 0.0
+    overall_pct_diff = round(overall_pct_diff, 2)
+
     summary_df = pd.DataFrame(
         [
             {
@@ -539,18 +576,14 @@ def build_metrics_report(image_key, metrics, classes, manual_metrics=None):
                 "height": metrics["height"],
                 "entropy": metrics["entropy"],
                 "num_present_classes": metrics["num_present_classes"],
+                "overall_pct_instance_diff": overall_pct_diff,
             }
         ]
     ).set_index("image")
 
-    computed_df = build_instance_table(metrics, classes)
-    manual_df = build_manual_instance_table(image_key, manual_metrics=manual_metrics)
-    compare_df = build_instance_comparison_table(computed_df, manual_df)
-
     return {
         "summary": summary_df,
-        "computed_instances": computed_df,
-        "manual_instances": manual_df,
+        "instances": instances_df,
         "instance_comparison": compare_df,
     }
 
@@ -562,6 +595,7 @@ def make_instance_report(
     color_to_class,
     manual_metrics=None,
     instance_methods=None,
+    manual_key=None,
 ):
     metrics = compute_metrics_from_rgb(
         rgb_mask,
@@ -574,4 +608,47 @@ def make_instance_report(
         metrics,
         classes,
         manual_metrics=manual_metrics or MANUAL_METRICS,
+        manual_key=manual_key,
     )
+
+
+def plot_instance_comparison(compare_df, title=None, max_classes=None):
+    df = compare_df.copy()
+    df = df[(df["computed_instances"] > 0) | (df["ground_truth_instances"] > 0)]
+    if df.empty:
+        print("No instances to compare.")
+        return None
+
+    order = df["ground_truth_instances"].sort_values(ascending=False).index.tolist()
+    if max_classes is not None:
+        order = order[:max_classes]
+
+    df = df.reindex(order)
+    x = np.arange(len(order))
+    width = 0.38
+
+    fig, ax = plt.subplots(figsize=(max(10, len(order) * 0.6), 5))
+    ax.bar(
+        x - width / 2,
+        df["ground_truth_instances"].values,
+        width,
+        label="Ground Truth",
+        color="#2a9d8f",
+    )
+    ax.bar(
+        x + width / 2,
+        df["computed_instances"].values,
+        width,
+        label="Computed",
+        color="#457b9d",
+    )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(order, rotation=45, ha="right")
+    ax.set_ylabel("Instances")
+    ax.set_title(title or "Instance Comparison")
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+    return fig

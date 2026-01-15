@@ -565,7 +565,17 @@ def build_metrics_report(image_key, metrics, classes, manual_metrics=None, manua
         image_key=manual_key,
     )
     compare_df = build_instance_comparison_table(instances_df)
-    overall_pct_diff = float(compare_df["pct_diff"].mean()) if not compare_df.empty else 0.0
+    if not compare_df.empty:
+        total_gt = float(compare_df["ground_truth_instances"].sum())
+        if total_gt > 0:
+            weighted_sum = float(
+                (compare_df["ground_truth_instances"] * compare_df["pct_diff"]).sum()
+            )
+            overall_pct_diff = weighted_sum / total_gt
+        else:
+            overall_pct_diff = 0.0
+    else:
+        overall_pct_diff = 0.0
     overall_pct_diff = round(overall_pct_diff, 2)
 
     summary_df = pd.DataFrame(

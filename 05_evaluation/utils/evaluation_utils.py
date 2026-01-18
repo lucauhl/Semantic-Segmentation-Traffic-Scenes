@@ -4,7 +4,6 @@ import torchvision.transforms.functional as F
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
-
 # Add project directories so local modules import correctly
 import sys
 from pathlib import Path
@@ -30,8 +29,7 @@ from models.segformer import SegFormer
 
 
 ### Helpers
-# Original 1536, 2048
-# Crop auf Cityscapes Format (1024, 2048)
+# Crop size (Original 1024x2048)
 HEIGHT, WIDTH = 512, 1024
 # Cityscapes 20 class colors (R,G,B) based on current trainIds (added vegetation and parking classes)
 CITYSCAPES_COLORS_20 = np.array([
@@ -122,20 +120,20 @@ def build_model(model_name, num_classes, backbone="b1"):
 
 
 def load_model(name, checkpoint, num_classes=20):
-    # Wenn CUDA verfügbar ist, wird 'cuda' genutzt, sonst 'cpu'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # 2. Checkpoint laden
-    # WICHTIG: map_location=device sorgt dafür, dass die Gewichte auf das richtige Gerät (z.B. CPU) gemappt werden
+    
+    # Load checkpoint
     checkpoint_path = f"../checkpoints/{checkpoint}/best_{checkpoint}.pth"
     checkpoint_data = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
-    # 3. Modell bauen und auf das Gerät schieben
+    # Build model and move to device
     model = build_model(name, num_classes)
     model_name = getattr(model, "name")
     model = model.to(device)
 
-    # 4. Gewichte laden
+    # Load weights
     model.load_state_dict(checkpoint_data["model_state_dict"])
+    # Switch model to eval mode
     model.eval()
     
     print(f"Loaded model: {model_name}")
@@ -149,7 +147,7 @@ def load_model(name, checkpoint, num_classes=20):
     print(f" - Val Accuracy: {checkpoint_data['val_acc']:.3f}")
     print(f" - Val MIoU: {checkpoint_data['val_miou']:.3f}")
 
-    # Trainings-Statistiken extrahieren
+    # Extract training stats
     train_stats = {
         "epoch": checkpoint_data.get('epoch', 0),
         "train_miou": checkpoint_data.get('train_miou', 0.0),
@@ -213,7 +211,7 @@ def plot_images(image, image_title, label, label_title, figsize=(12, 6)):
 
     plt.show()
 
-# --- VISUALISIERUNG ( 3er Plot Funktion) ---
+# Visualization (3 Plots)
 def plot_three_images(img1, title1, img2, title2, img3, title3, figsize=(18, 6)):
     _, ax = plt.subplots(1, 3, figsize=figsize)
     ax[0].imshow(img1); ax[0].set_title(title1); ax[0].axis("off")
@@ -228,12 +226,12 @@ def run_evaluation_pipeline(model_type, checkpoint_name, base_path="./CVATAnnota
         print(f"Path {base_path} does not exist.")
         return None
 
-    # Modell und gespeicherte Stats laden
+    # Load model and saved stats
     model, device, train_stats = load_model(model_type, checkpoint_name)
 
     image_files = sorted(list(cvat_path.glob("*r.jpg")))
 
-    # Listen für die neuen Eval-Ergebnisse
+    # Lists for eval results
     eval_mious = []
     eval_accs = []
 
@@ -265,11 +263,11 @@ def run_evaluation_pipeline(model_type, checkpoint_name, base_path="./CVATAnnota
                 rgb_pred, f"Pred ({model_type})"
             )
 
-    # Durchschnitt für Regensburg (Eval) berechnen
+    # Compute averages (eval) for Regensburg
     avg_eval_miou = np.mean(eval_mious) if eval_mious else 0.0
     avg_eval_acc = np.mean(eval_accs) if eval_accs else 0.0
 
-    # Zusammenfassendes Dictionary erstellen
+    # Create summary dictionary
     summary = {
         "Model": model_type,
         "Checkpoint": checkpoint_name,

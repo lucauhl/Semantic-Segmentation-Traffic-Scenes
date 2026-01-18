@@ -122,9 +122,19 @@ The `output/` folder contains intermediate artifacts produced by the pipeline:
 
 ## Resources Used
 
+* **Affected Section:** `01_bussinesunderstanding/business_understanding_report.md`
+* **AI Tool Used:** ChatGPT
+* **Model Version:** GPT-5.1
+* **Purpose, Nature, and Scope of Use:** Translation of the Business Understanding Report from German to English.
+
 * **Affected Code Section:** `04_modeling/models/segformer.py`, Class `SegFormer`, specifically the integration of the `phi` parameter in `__init__` and the configuration adaptation.
 * **AI Tool Used:** ChatGPT
 * **Model Version:** GPT-5.2
 * **Purpose, Nature, and Scope of Use:** Assistance with the implementation of the `phi` parameter for dynamic model configuration (b0, b1, b2) based on the SegFormer paper. The AI helped to structure the initialization logic.
+
+* **Affected Code Section:** Project-wide import handling (e.g., in `04_modeling/..` and `03_datapreperation/..`).
+* **AI Tool Used:** ChatGPT
+* **Model Version:** GPT-5.2
+* **Purpose, Nature, and Scope of Use:** AI-generated code for dynamic `sys.path` manipulation. This was necessary because the Crisp-DM compliant directory naming (e.g., `03_datapreparation`, `04_modeling`) prevented standard Python import discovery.
 
 I hereby declare that I have listed all AI tools used by me as resources and have transparently and comprehensively described their purpose, nature, and scope of use for the affected sections of the written work and the code.

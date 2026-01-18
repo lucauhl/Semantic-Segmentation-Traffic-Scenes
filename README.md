@@ -119,3 +119,12 @@ The `output/` folder contains intermediate artifacts produced by the pipeline:
 ## Notes
 - The training and evaluation notebooks assume 20 classes (including vegetation and parking). See `labels.py` for label mappings.
 - The CVAT evaluation set is small and meant for qualitative checks and metric prototypes.
+
+## Resources Used
+
+* **Affected Code Section:** `04_modeling/models/segformer.py`, Class `SegFormer`, specifically the integration of the `phi` parameter in `__init__` and the configuration adaptation.
+* **AI Tool Used:** ChatGPT
+* **Model Version:** GPT-5.2
+* **Purpose, Nature, and Scope of Use:** Assistance with the implementation of the `phi` parameter for dynamic model configuration (b0, b1, b2) based on the SegFormer paper. The AI helped to structure the initialization logic.
+
+I hereby declare that I have listed all AI tools used by me as resources and have transparently and comprehensively described their purpose, nature, and scope of use for the affected sections of the written work and the code.

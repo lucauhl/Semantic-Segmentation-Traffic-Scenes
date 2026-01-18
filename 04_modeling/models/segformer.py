@@ -32,7 +32,11 @@ MIT_CONFIGS = {
     }
 }
 
-
+# --- Resources Used ---
+# Affected section: Integration of the phi parameter
+# AI Tool Used: ChatGPT (GPT-5.2)
+# Purpose: Support with dynamic model configuration
+# ----------------------
 class SegFormer(nn.Module):
     def __init__(self, num_classes=10, phi="b0"):
         super(SegFormer, self).__init__()

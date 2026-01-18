@@ -139,6 +139,7 @@ def load_model(name, checkpoint, num_classes=20):
     model.eval()
     
     print(f"Loaded model: {model_name}")
+    print(f"Device: {device}")
     print(f"Best checkpoint:")
     print(f" - Epoch: {checkpoint_data['epoch']:.3f}")
     print(f" - Train Loss: {checkpoint_data['train_loss']:.3f}")
@@ -193,6 +194,11 @@ def eval(pred, truth, num_classes):
     accuracy = compute_accuracy(pred, train_label)
 
     return miou, ious, accuracy
+
+def print_results(miou, acc):
+    print("Results:")
+    print(f" - MIoU: {miou:.3f}")
+    print(f" - Pixel Accuracy: {acc:.3f}")
 
 def plot_images(image, image_title, label, label_title, figsize=(12, 6)):
     _, ax = plt.subplots(1, 2, figsize=figsize)

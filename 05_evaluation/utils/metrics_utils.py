@@ -89,6 +89,7 @@ CC_MIN_AREA = 20
 
 
 def find_cvat_annotations(start_path=None):
+    # Walk up the directory tree to locate the expected CVAT annotations folder.
     if start_path is None:
         start_path = Path.cwd().resolve()
     else:
@@ -110,6 +111,7 @@ def find_cvat_annotations(start_path=None):
 
 
 def _load_rgb_image(path: Path, label):
+    # Read image in BGR and convert to RGB for consistent downstream handling.
     image = cv2.imread(str(path))
     if image is None:
         raise FileNotFoundError(f"{label} not found: {path}")
@@ -117,6 +119,7 @@ def _load_rgb_image(path: Path, label):
 
 
 def load_demo_context(image_name="bild6r.jpg", label_name="bild6.png", start_path=None):
+    # Bundle common paths and loaded assets used by demo notebooks.
     cvat_path = find_cvat_annotations(start_path=start_path)
     image_path = cvat_path / image_name
     label_path = cvat_path / label_name
@@ -141,6 +144,7 @@ def load_demo_context(image_name="bild6r.jpg", label_name="bild6.png", start_pat
 
 
 def _find_repo_root(start_path: Path):
+    # Locate repo root by searching for the shared labels.py file.
     for p in [start_path, *start_path.parents]:
         if (p / "labels.py").exists():
             return p
@@ -148,6 +152,7 @@ def _find_repo_root(start_path: Path):
 
 
 def _try_load_name2label(repo_root):
+    # Best-effort import of the project's label metadata.
     if repo_root is None:
         return {}
     repo_str = str(repo_root)
@@ -166,6 +171,7 @@ def load_labelmap(labelmap_path: Path):
     color_to_class = {}
     name2label = _try_load_name2label(_find_repo_root(labelmap_path.resolve()))
 
+    # Parse "name: R,G,B: ..." lines into class records and color lookup.
     for line in labelmap_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -193,6 +199,7 @@ def load_labelmap(labelmap_path: Path):
 
 
 def _ensure_rgb(mask_rgb):
+    # Validate input is an HxWx3 array and normalize dtype.
     if isinstance(mask_rgb, np.ndarray):
         arr = mask_rgb
     else:
@@ -207,6 +214,7 @@ def _ensure_rgb(mask_rgb):
 
 
 def compute_class_counts(mask_rgb, classes, color_to_class):
+    # Count pixels per class by matching RGB colors.
     mask = _ensure_rgb(mask_rgb)
     class_counts = {c["name"]: 0 for c in classes}
     flat = mask.reshape(-1, 3)
@@ -220,6 +228,7 @@ def compute_class_counts(mask_rgb, classes, color_to_class):
 
 
 def compute_entropy(class_counts, classes, ignore_train_ids=None, ignore_names=None):
+    # Compute entropy over valid (non-ignored) pixels only.
     if ignore_train_ids is None:
         ignore_train_ids = DEFAULT_IGNORE_TRAIN_IDS
     if ignore_names is None:
@@ -247,6 +256,7 @@ def compute_entropy(class_counts, classes, ignore_train_ids=None, ignore_names=N
 
 
 def compute_cc_instances(mask_rgb, classes, min_area=CC_MIN_AREA):
+    # Count connected components per class above a minimum area threshold.
     mask = _ensure_rgb(mask_rgb)
     counts = {c["name"]: 0 for c in classes}
     for rec in classes:
@@ -264,6 +274,7 @@ def compute_cc_instances(mask_rgb, classes, min_area=CC_MIN_AREA):
 
 
 def _peak_local_max_fallback(dist, min_distance=6, threshold_rel=0.2, labels=None):
+    # Simple peak detection using dilation when skimage is unavailable.
     if labels is not None:
         dist = dist.copy()
         dist[labels == 0] = 0
@@ -307,6 +318,7 @@ def compute_watershed_instances(
     seed_open_kernel=WS_SEED_OPEN_KERNEL,
     instance_classes=None,
 ):
+    # Watershed-based instance counting per class.
     mask = _ensure_rgb(mask_rgb)
     counts = {c["name"]: 0 for c in classes}
     kernel = np.ones((3, 3), np.uint8)
@@ -339,6 +351,7 @@ def compute_watershed_instances(
         dist_norm = dist / max_d
 
         if use_peaks:
+            # Use local maxima as seeds when possible, otherwise fall back to threshold seeds.
             dilated = cv2.dilate(dist, kernel)
             peaks = (dist >= (dilated - peak_eps)) & (dist_norm > dist_rel)
             seed_mask = peaks.astype(np.uint8)
@@ -351,6 +364,7 @@ def compute_watershed_instances(
 
         num_markers, markers = cv2.connectedComponents(seed_mask)
         if num_markers <= 1 and use_peaks:
+            # Retry with a broader seed mask if peak detection under-segments.
             seed_mask = (dist_norm > dist_rel).astype(np.uint8)
             if seed_open_kernel and seed_open_kernel > 1:
                 sk = np.ones((seed_open_kernel, seed_open_kernel), np.uint8)
@@ -363,6 +377,7 @@ def compute_watershed_instances(
         markers = markers + 1
         markers[binary == 0] = 0
 
+        # Run watershed on a grayscale BGR image because OpenCV expects 3 channels.
         img_for_ws = cv2.cvtColor((binary * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
         markers = cv2.watershed(img_for_ws, markers)
 
@@ -384,6 +399,7 @@ def compute_peak_instances(
     erode_iters=PEAK_ERODE_ITERS,
     instance_classes=None,
 ):
+    # Count peaks of the distance transform as instances.
     mask = _ensure_rgb(mask_rgb)
     counts = {c["name"]: 0 for c in classes}
     kernel = np.ones((3, 3), np.uint8)
@@ -414,6 +430,7 @@ def compute_peak_instances(
             continue
 
         if sk_peak_local_max is None:
+            # Fall back when skimage is not installed.
             peaks = _peak_local_max_fallback(
                 dist,
                 min_distance=min_distance,
@@ -442,6 +459,7 @@ def compute_metrics_from_rgb(
     ignore_train_ids=None,
     ignore_names=None,
 ):
+    # Aggregate pixel stats, entropy, and per-class instance counts.
     mask = _ensure_rgb(mask_rgb)
     h, w, _ = mask.shape
 
@@ -463,6 +481,7 @@ def compute_metrics_from_rgb(
         method = (instance_methods or INSTANCE_METHODS).get(name, DEFAULT_INSTANCE_METHOD)
         method_map[name] = method
 
+    # Dispatch instance counting per class based on method_map.
     ws_classes = {n for n, m in method_map.items() if m == "watershed"}
     peak_classes = {n for n, m in method_map.items() if m == "peaks"}
     cc_counts = compute_cc_instances(mask, classes)
@@ -507,6 +526,7 @@ def compute_metrics_from_rgb(
 
 
 def build_instance_table(metrics, classes, manual_metrics=None, image_key=None):
+    # Build a per-class table of instance counts and optional ground truth.
     rows = []
     for rec in classes:
         name = rec["name"]
@@ -535,6 +555,7 @@ def build_instance_table(metrics, classes, manual_metrics=None, image_key=None):
 
 
 def build_manual_instance_table(image_key, manual_metrics=None):
+    # Convert the manual per-image instance dict into a DataFrame.
     manual_metrics = manual_metrics or MANUAL_METRICS
     manual = manual_metrics.get(image_key, {}).get("instances", {})
     df = pd.DataFrame({"ground_truth_instances": manual}).rename_axis("class")
@@ -542,6 +563,7 @@ def build_manual_instance_table(image_key, manual_metrics=None):
 
 
 def build_instance_comparison_table(instances_df):
+    # Normalize columns and compute absolute and percentage differences.
     df = instances_df.copy()
     if "ground_truth_instances" not in df.columns:
         df["ground_truth_instances"] = 0
@@ -557,6 +579,7 @@ def build_instance_comparison_table(instances_df):
 
 
 def build_metrics_report(image_key, metrics, classes, manual_metrics=None, manual_key=None):
+    # Combine summary metrics with per-class instance tables.
     manual_key = manual_key or image_key
     instances_df = build_instance_table(
         metrics,
@@ -607,6 +630,7 @@ def make_instance_report(
     instance_methods=None,
     manual_key=None,
 ):
+    # Convenience wrapper for computing and formatting reports.
     metrics = compute_metrics_from_rgb(
         rgb_mask,
         classes,
@@ -623,6 +647,7 @@ def make_instance_report(
 
 
 def plot_instance_comparison(compare_df, title=None, max_classes=None):
+    # Visualize instance counts for ground truth vs computed values.
     df = compare_df.copy()
     df = df[(df["computed_instances"] > 0) | (df["ground_truth_instances"] > 0)]
     if df.empty:

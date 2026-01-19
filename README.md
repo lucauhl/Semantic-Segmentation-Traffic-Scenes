@@ -86,11 +86,11 @@ python -m cityscapesscripts.preparation.createTrainIdLabelImgs
    - Copies the filtered subset into a standalone Cityscapes-like layout.
 6. **HPC filtering (optional)**: `03_datapreparation/filter_cityscapes_for_hpc.ipynb`
    - Copies only `_leftImg8bit.png` and `_labelTrainIds.png` to reduce size for server upload.
-
+7. **Augmentations**: `03_datapreparation/augmenation/augmentation_visualisation.ipynb`
+   - Visualizes the custom augmentation pipeline defined in `augmentations.py`.
 ## Modeling
 - Model implementations live in `04_modeling/models/`:
   - `UNet`, `DeepLabV3Plus`, `SegFormer`.
-- Augmentations are in `04_modeling/utils/augmentations.py`.
 - Loss: `04_modeling/utils/focal_loss.py`.
 - deprecated Training notebook for testing purposes: `model_training.ipynb`.
 - main HPC training script, used for training on the HPC server: `04_modeling/hpcdata/train_script.py` and `submit_job.sh` .
@@ -136,5 +136,10 @@ The `output/` folder contains intermediate artifacts produced by the pipeline:
 * **AI Tool Used:** ChatGPT
 * **Model Version:** GPT-5.2
 * **Purpose, Nature, and Scope of Use:** AI-generated code for dynamic `sys.path` manipulation. This was necessary because the Crisp-DM compliant directory naming (e.g., `03_datapreparation`, `04_modeling`) prevented standard Python import discovery.
+
+* **Affected Code Section:** intersection_heading_matching.ipynb,intersection_image_matching.ipynb,kennzahlen.ipynb,metrics_utils.py.
+* **AI Tool Used:** ChatGPT
+* **Model Version:** GPT-5.2 
+* **Purpose, Nature, and Scope of Use:** Refactoring, Imrpoving comments and documentation. Bug fixing/trouble shooting
 
 I hereby declare that I have listed all AI tools used by me as resources and have transparently and comprehensively described their purpose, nature, and scope of use for the affected sections of the written work and the code.

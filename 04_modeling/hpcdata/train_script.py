@@ -23,7 +23,7 @@ from models.segformer import SegFormer
 from models.unet import UNet
 from utils.focal_loss import FocalLoss
 from cityscapes_dataset import CityscapesDataset
-from utils.augmentations import (
+from augmentations import (
     JointCompose, JointToTensor, JointResize, JointRandomHorizontalFlip,
     JointRandomAffine, JointColorJitter, RandomBlur, RandomNoise,
     RandomCoarseDropout, OneOf, JointRandomScale, JointRandomCrop, JointNormalize

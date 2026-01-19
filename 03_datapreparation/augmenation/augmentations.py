@@ -7,16 +7,16 @@ from PIL import Image, ImageFilter
 """
 Custom Augmentation (Native PyTorch/PIL Implementation)
 
-Diese Implementierung wurde von Grund auf implementiert, um externe 
-Abhängigkeiten zu vermeiden. Dabei orientiert sich die Struktur – und insbesondere 
-die Auswahl und Logik der später hinzugefügten, komplexeren Augmentations – 
-an der Bibliothek 'albumentations'.
+This implementation was implemented from scratch to avoid external 
+dependencies. The structure – and especially the selection and logic 
+of the more complex augmentations added later – follows the 
+'albumentations' library.
 https://albumentations.ai/docs/
 """
 
 
 class OneOf:
-    """Wählt zufällig eine Augmentation aus einer Liste aus."""
+    """Randomly selects one augmentation from a list."""
 
     def __init__(self, transforms, p=1.0):
         self.transforms = transforms
@@ -73,7 +73,7 @@ class JointRandomCrop:
 
 
 class JointRandomAffine:
-    """Entspricht A.ShiftScaleRotate: Drehen, Verschieben, Zoomen."""
+    """Corresponds to A.ShiftScaleRotate: Rotate, Translate, Scale."""
 
     def __init__(self, degrees=0, translate=None, scale=None, p=0.5, ignore_index=255):
         self.degrees = degrees
@@ -84,8 +84,8 @@ class JointRandomAffine:
 
     def __call__(self, image, label):
         if random.random() < self.p:
-            # Parameter generieren
-            # Hinweis: degrees muss eine range sein, z.B. (-30, 30)
+            # Generate parameters
+            # Note: degrees must be a range, e.g. (-30, 30)
             angle, translations, scale, shear = T.RandomAffine.get_params(
                 degrees=self.degrees if isinstance(self.degrees, (tuple, list)) else (-self.degrees, self.degrees),
                 translate=self.translate,
@@ -95,7 +95,7 @@ class JointRandomAffine:
             )
 
             image = F.affine(image, angle, translations, scale, shear, F.InterpolationMode.BILINEAR)
-            # WICHTIG: Maske mit ignore_index füllen bei Drehung
+            # IMPORTANT: Fill mask with ignore_index during rotation
             label = F.affine(label, angle, translations, scale, shear, F.InterpolationMode.NEAREST,
                              fill=self.ignore_index)
 
@@ -116,14 +116,14 @@ class JointRandomHorizontalFlip:
 
 
 class RandomBlur:
-    """Simuliert MotionBlur / MedianBlur / GaussianBlur."""
+    """Simulates MotionBlur / MedianBlur / GaussianBlur."""
 
     def __init__(self, p=0.5):
         self.p = p
 
     def __call__(self, image, label):
         if random.random() < self.p:
-            # Zufällig einen Blur-Typ wählen
+            # Randomly choose a blur type
             mode = random.choice(['gaussian', 'box'])
             if mode == 'gaussian':
                 radius = random.uniform(0.5, 2.0)
@@ -134,7 +134,7 @@ class RandomBlur:
 
 
 class RandomNoise:
-    """Fügt Gauss-Rauschen hinzu."""
+    """Adds Gaussian noise."""
 
     def __init__(self, p=0.5, intensity=20):
         self.p = p
@@ -170,8 +170,8 @@ class JointColorJitter:
 # https://www.kaggle.com/c/siim-isic-melanoma-classification/discussion/169721
 class RandomCoarseDropout:
     """
-    Schneidet Rechtecke aus dem Bild (Cutout) UND dem Label.
-    Das Label wird dabei mit dem ignore_index gefüllt.
+    Cuts out rectangles from the image (Cutout) AND the label.
+    The label is filled with the ignore_index.
     """
 
     def __init__(self, max_holes=8, max_height=32, max_width=32, p=0.5, fill_label=255):
@@ -179,13 +179,13 @@ class RandomCoarseDropout:
         self.max_height = max_height
         self.max_width = max_width
         self.p = p
-        self.fill_label = fill_label  # Der Wert, der im Label gesetzt wird (z.B. 255 für ignore)
+        self.fill_label = fill_label  # The value set in the label (e.g. 255 for ignore)
 
     def __call__(self, image, label):
         if random.random() < self.p:
             w, h = image.size
 
-            # Bild und Label in Numpy-Arrays wandeln
+            # Convert image and label to Numpy arrays
             img_arr = np.array(image)
             lbl_arr = np.array(label)
 
@@ -199,18 +199,18 @@ class RandomCoarseDropout:
                 y2 = min(h, y + h_hole)
                 x2 = min(w, x + w_hole)
 
-                # Bild: Setze Pixel auf Schwarz (0)
-                # Check, ob Bild 2D (Graustufen) oder 3D (RGB) ist
+                # Image: Set pixels to black (0)
+                # Check if image is 2D (grayscale) or 3D (RGB)
                 if len(img_arr.shape) == 3:
                     img_arr[y:y2, x:x2, :] = 0
                 else:
                     img_arr[y:y2, x:x2] = 0
 
-                # Label: Setze Pixel auf ignore_index (255)
-                # Labels sind in der Regel 2D (H, W)
+                # Label: Set pixels to ignore_index (255)
+                # Labels are usually 2D (H, W)
                 lbl_arr[y:y2, x:x2] = self.fill_label
 
-            # Zurück zu PIL Images
+            # Back to PIL Images
             image = Image.fromarray(img_arr)
             label = Image.fromarray(lbl_arr)
 

@@ -21,7 +21,7 @@ This project builds a pipeline to extract and analyze urban traffic infrastructu
 | Intersections only | DeepLabV3+ | 0.694 | 0.509 | 0.318 | 0.960 |	0.929 |	0.841 |
 | Intersections only | SegFormer | 0.558 | 0.467 | 0.333 | 0.933 |	0.912 |	0.855 |
 | Intersections only | UNet | 0.347 | 0.328 | 0.247 | 0.882	| 0.874	| 0.821 |
-| Complete Cityscapes | DeepLabV3+ | 0.810 | 0.634 | 0.388 | 0.971	| 0.952 |	0.909 |
+| **Complete Cityscapes** | **DeepLabV3+** | **0.810** | **0.634** | **0.388** | **0.971**	| **0.952** |	**0.909** |
 | Complete Cityscapes | SegFormer | 0.688 | 0.599 | 0.389 | 0.955 |	0.943 |	0.903 |
 | Complete Cityscapes | UNet | 0.686 | 0.549 | 0.363 | 0.962	| 0.942	| 0.874 |
 

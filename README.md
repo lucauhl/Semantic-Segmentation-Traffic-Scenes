@@ -13,7 +13,7 @@ This project builds a pipeline to extract and analyze urban traffic infrastructu
 - Evaluate on CVAT-annotated images (mIoU, accuracy, instance counts).
 
 ## Project Structure
-- `01_bussinesunderstanding/`: business understanding report and planning artifacts.
+- `01_businessunderstanding/`: business understanding report and planning artifacts.
 - `02_dataunderstanding/`: Cityscapes exploration notebook.
 - `03_datapreparation/`: GPS matching, intersection extraction, filtering, subset copy.
 - `04_modeling/`: model implementations, augmentation utilities, focal loss, HPC scripts.
@@ -119,32 +119,3 @@ The `output/` folder contains intermediate artifacts produced by the pipeline:
 ## Notes
 - The training and evaluation notebooks assume 20 classes (including vegetation and parking). See `labels.py` for label mappings.
 - The CVAT evaluation set is small and meant for qualitative checks and metric prototypes.
-
-## Resources Used
-
-* **Affected Section:** `01_bussinesunderstanding/business_understanding_report.md`
-* **AI Tool Used:** ChatGPT
-* **Model Version:** GPT-5.1
-* **Purpose, Nature, and Scope of Use:** Translation of the Business Understanding Report from German to English.
-
-* **Affected Code Section:** `04_modeling/models/segformer.py`, Class `SegFormer`, specifically the integration of the `phi` parameter in `__init__` and the configuration adaptation.
-* **AI Tool Used:** ChatGPT
-* **Model Version:** GPT-5.2
-* **Purpose, Nature, and Scope of Use:** Assistance with the implementation of the `phi` parameter for dynamic model configuration (b0, b1, b2) based on the SegFormer paper. The AI helped to structure the initialization logic.
-
-* **Affected Code Section:** Project-wide import handling (e.g., in `04_modeling/..` and `03_datapreperation/..`).
-* **AI Tool Used:** ChatGPT
-* **Model Version:** GPT-5.2
-* **Purpose, Nature, and Scope of Use:** AI-generated code for dynamic `sys.path` manipulation. This was necessary because the Crisp-DM compliant directory naming (e.g., `03_datapreparation`, `04_modeling`) prevented standard Python import discovery.
-
-* **Affected Code Section:** `intersection_heading_matching.ipynb`, `intersection_image_matching.ipynb`, `kennzahlen.ipynb`, `metrics_utils.py`
-* **AI Tool Used:** ChatGPT
-* **Model Version:** GPT-5.2 
-* **Purpose, Nature, and Scope of Use:** Refactoring, Improving comments and documentation. Bug fixing/trouble shooting
-
-* **Affected Code Section:** `data_understanding.ipynb`, `image_gps_matching.ipynb`, `filter_intersection_images.ipynb`, `inference_visualisation.ipynb`
-* **AI Tool Used:** ChatGPT
-* **Model Version:** GPT-5.2 
-* **Purpose, Nature, and Scope of Use:** Translation (German to English) and improvement of existing comments
-
-I hereby declare that I have listed all AI tools used by me as resources and have transparently and comprehensively described their purpose, nature, and scope of use for the affected sections of the written work and the code.

@@ -1,21 +1,12 @@
 # Intersection-Focused Semantic Segmentation of Traffic Scenes
-## Overview
+## Project Overview
 This project builds a pipeline to extract and analyze urban traffic infrastructure at intersections using semantic segmentation. It also investigates whether semantic segmentation models trained on
 general urban street scenes can generalize to traffic scenes around urban
-intersections.
+intersections. 
 
-We compare three different model architectures:
-- DeepLabV3+
-- SegFormer
-- UNet
+We compare three different model architectures (DeepLabV3+, SegFormer, UNet). The segmentation models are trained either on the complete Cityscapes dataset or on a filtered subset containing only images from intersections. They are evaluated on unseen intersection images from Regensburg.
 
-The segmentation models are trained either on the complete Cityscapes dataset or on a filtered subset containing only images from intersections. They are evaluated on unseen intersection images from Regensburg.
-
-> **Key Result:** Training on the complete Cityscapes dataset generalizes
-> better to unseen intersections than training on intersection-only images.
-> DeepLabV3+ achieves the strongest overall performance in this project.
-
-The following figures compare the original image, ground truth, and prediction for the same unseen Regensburg sample. All models (DeepLabV3+, SegFormer, UNet) were trained on the complete Cityscapes dataset.
+**Key Result:** Training on the complete Cityscapes dataset generalizes better to unseen intersections than training on intersection-only images, with DeepLabV3+ achieving the strongest overall performance in this project.
 
 <table>
   <tr>
@@ -53,10 +44,7 @@ The following figures compare the original image, ground truth, and prediction f
   </tr>
 </table>
 
-### Key Takeaways
-- DeepLabV3+ trained on the complete Cityscapes dataset achieved the strongest validation score in this project.
-- Restricting training to intersection-only samples did not improve the models and often led to earlier overfitting.
-- The final augmentation strategy keeps the helpful transforms and drops the ones that hurt robustness.
+The figures above compare the original image, ground truth, and prediction for the same unseen Regensburg sample. All models (DeepLabV3+, SegFormer, UNet) were trained on the complete Cityscapes dataset.
 
 ### Evaluation Summary
 | Training data | Model | Train mIoU | Val mIoU | Regensburg mIoU | Train acc | Val acc | Regensburg acc |
@@ -68,7 +56,7 @@ The following figures compare the original image, ground truth, and prediction f
 | Complete Cityscapes | SegFormer | 0.688 | 0.599 | 0.389 | 0.955 |	0.943 |	0.903 |
 | Complete Cityscapes | UNet | 0.686 | 0.549 | 0.363 | 0.962	| 0.942	| 0.874 |
 
-`Regensburg` refers to the external CVAT-annotated evaluation set and is not
+**Regensburg** refers to the external CVAT-annotated evaluation set and is not
 part of the Cityscapes training or validation split.
 
 ### Cityscapes Dataset
@@ -170,8 +158,7 @@ images, while small-object classes such as rider, traffic sign, and traffic
 light occupy only a small fraction of all pixels.
 
 Focal loss is used to reduce the influence of easy, dominant background
-pixels and focus training on difficult examples. The motivation and loss
-function are described below.
+pixels and focus training on difficult examples.
 
 <table width="75%">
   <tr>

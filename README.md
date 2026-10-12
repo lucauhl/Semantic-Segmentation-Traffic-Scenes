@@ -1,14 +1,57 @@
 # Intersection-Focused Semantic Segmentation of Traffic Scenes
-
-This project builds a pipeline to extract and analyze urban traffic infrastructure at intersections using semantic segmentation. It combines Cityscapes imagery and labels with GPS metadata and OpenStreetMap intersection geometry, trains segmentation models (UNet, DeepLabV3+, SegFormer) on the Cityscapes dataset and an intersection-only training subset, and evaluates them on CVAT-annotated intersection images with mIoU, pixel metrics, and instance metrics.
-
 ## Overview
-**Key result:** The full Cityscapes training setup generalizes better than the intersection-only subset, and DeepLabV3+ is the strongest overall model in this project.
+This project builds a pipeline to extract and analyze urban traffic infrastructure at intersections using semantic segmentation. It also investigates whether semantic segmentation models trained on
+general urban street scenes can generalize to traffic scenes around urban
+intersections.
 
-<figure>
-  <img src="./attachments/readme/deeplab_prediction_overview.png" alt="DeepLabV3+ Prediction Overview" width="1200">
-  <figcaption><i>DeepLabV3+ prediction of an unseen Regensburg evaluation sample. The model was trained on the complete Cityscapes dataset</i></figcaption>
-</figure>
+We compare three different model architectures:
+- DeepLabV3+
+- SegFormer
+- UNet
+
+The segmentation models are trained either on the complete Cityscapes dataset or on a filtered subset containing only images from intersections. They are evaluated on unseen intersection images from Regensburg.
+
+> **Key Result:** Training on the complete Cityscapes dataset generalizes
+> better to unseen intersections than training on intersection-only images.
+> DeepLabV3+ achieves the strongest overall performance in this project.
+
+The following figures compare the original image, ground truth, and prediction for the same unseen Regensburg sample. All models (DeepLabV3+, SegFormer, UNet) were trained on the complete Cityscapes dataset.
+
+<table>
+  <tr>
+    <th>DeepLabV3+</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img
+        src="./attachments/readme/deeplab_prediction_overview.png"
+        alt="DeepLabV3+ prediction overview"
+        width="1000">
+    </td>
+  </tr>
+  <tr>
+    <th>SegFormer</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img
+        src="./attachments/readme/segformer_prediction_overview.png"
+        alt="SegFormer prediction overview"
+        width="1000">
+    </td>
+  </tr>
+  <tr>
+    <th>UNet</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img
+        src="./attachments/readme/unet_prediction_overview.png"
+        alt="UNet prediction overview"
+        width="1000">
+    </td>
+  </tr>
+</table>
 
 ### Key Takeaways
 - DeepLabV3+ trained on the complete Cityscapes dataset achieved the strongest validation score in this project.
@@ -24,6 +67,132 @@ This project builds a pipeline to extract and analyze urban traffic infrastructu
 | **Complete Cityscapes** | **DeepLabV3+** | **0.810** | **0.634** | **0.388** | **0.971**	| **0.952** |	**0.909** |
 | Complete Cityscapes | SegFormer | 0.688 | 0.599 | 0.389 | 0.955 |	0.943 |	0.903 |
 | Complete Cityscapes | UNet | 0.686 | 0.549 | 0.363 | 0.962	| 0.942	| 0.874 |
+
+`Regensburg` refers to the external CVAT-annotated evaluation set and is not
+part of the Cityscapes training or validation split.
+
+### Cityscapes Dataset
+<table width="75%">
+  <tr>
+    <td rowspan="2" width="50%">
+      <img src="./attachments/readme/cityscapes_image_locations.jpg"
+           alt="Locations of the Cityscapes images"
+           width="100%">
+      <p align="center">
+        <sub>Locations of the Cityscapes images</sub>
+      </p>
+    </td>
+    <td width="50%">
+      <img src="./attachments/readme/sample_coarse_annotation.png"
+           alt="Sample of a coarse annotated image"
+           width="100%">
+      <p align="center">
+        <sub>Sample of a coarse annotated image</sub>
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="./attachments/readme/sample_fine_annotation.png"
+           alt="Sample of a fine annotated image"
+           width="100%">
+      <p align="center">
+        <sub>Sample of a fine annotated image</sub>
+      </p>
+    </td>
+  </tr>
+</table>
+
+**About the dataset:**
+- Street level imagery
+- 5,000 fine annotated images
+- 20,000 coarse annotated images
+- GPS-metadata
+- 30 classes in total: 
+  - flat: road, sidewalk, parking, ...
+  - human: person, rider (a person on a bycicle, motorcycle, scooter, ...)
+  - vehicle: car, truck, bus, motorcycle, bycicle, ...
+  - object: pole, traffic sign and traffic light, ...
+
+### Training methodology
+
+The models are trained in two consecutive stages and then evaluated on an
+unseen external dataset:
+
+```mermaid
+flowchart LR
+    A[Cityscapes coarse annotations<br/>15 epochs<br/>5 warmup epochs]
+    --> B[Cityscapes fine annotations<br/>150 epochs<br/>10 warmup epochs]
+    --> C[External evaluation<br/>Regensburg CVAT images]
+```
+
+#### Training stages
+
+1. **Coarse-annotation pretraining**
+   - 15 epochs in total
+   - 5 warmup epochs
+2. **Fine-annotation training**
+   - 150 epochs in total
+   - 10 warmup epochs
+
+#### Optimization setup
+
+| Hyperparameter | Configuration |
+|:--|:--|
+| Optimizer | AdamW |
+| Learning-rate schedule | Cosine annealing |
+| Learning rate | 0.001 to 0.00001 |
+| Weight decay | 0.0001 |
+| Batch size | 32 |
+| Loss function | Focal loss |
+
+#### Data augmentation
+
+The following augmentations were applied during training:
+- Random scaling
+- Random cropping
+- Random horizontal flipping
+- Color jitter
+
+#### Evaluation metrics
+
+- **mIoU:** mean intersection over union across semantic classes
+- **Pixel accuracy:** fraction of correctly classified pixels
+- **Loss:** optimization objective monitored during training
+
+
+
+### Class imbalance & focal loss
+
+Cityscapes contains a strong pixel-level class imbalance. Large background
+classes such as road, building, sky, and vegetation dominate the training
+images, while small-object classes such as rider, traffic sign, and traffic
+light occupy only a small fraction of all pixels.
+
+Focal loss is used to reduce the influence of easy, dominant background
+pixels and focus training on difficult examples. The motivation and loss
+function are described below.
+
+<table width="75%">
+  <tr>
+    <td width="50%">
+      <img src="./attachments/readme/class_imbalance.png"
+           alt="Locations of the Cityscapes images"
+           width="100%">
+      <p align="center">
+        <sub>Class imbalance of the training dataset</sub>
+      </p>
+    </td>
+    <td width="50%">
+      <img src="./attachments/readme/focal_loss.png"
+           alt="Sample of a coarse annotated image"
+           width="100%">
+      <p align="center">
+        <sub>Visualization of focal loss</sub>
+      </p>
+    </td>
+  </tr>
+</table>
 
 ## Pipeline Overview
 - Explore Cityscapes dataset structure and classes.
